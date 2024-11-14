@@ -11,10 +11,11 @@ androidx-espresso-core = "3.6.1"
 androidx-lifecycle = "2.8.3"
 androidx-material = "1.12.0"
 androidx-test-junit = "1.2.1"
-compose-multiplatform = "1.7.0"
+compose-multiplatform = "1.7.1"
 junit = "4.13.2"
 kotlin = "2.0.21"
 ktor = "3.0.0"
+material3WindowSizeClass = "1.7.1"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -36,6 +37,7 @@ ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negoti
 ktor-client-logging = { module = "io.ktor:ktor-client-logging", version.ref = "ktor" }
 ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
 ktor-client-js = { module = "io.ktor:ktor-client-js", version.ref = "ktor" }
+material3-window-size = { module = "org.jetbrains.compose.material3:material3-window-size-class", version.ref = "material3WindowSizeClass" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

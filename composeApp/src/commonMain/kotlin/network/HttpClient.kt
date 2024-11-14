@@ -9,9 +9,9 @@ import io.ktor.client.request.header
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
 
-val client by lazy { getClient() }
+val client by lazy { createClient() }
 
-fun getClient(): HttpClient {
+fun createClient(): HttpClient {
     return HttpClient {
         install(ContentNegotiation) {
             json(
@@ -28,7 +28,7 @@ fun getClient(): HttpClient {
             header("content-type", "application/json")
             header("x-rapidapi-host", "claude-3-haiku-ai.p.rapidapi.com")
             header("x-rapidapi-key", "e151ba345bmshade52e55f3b5599p104313jsn506dedc049ff")
-            url("https://claude-3-haiku-ai.p.rapidapi.com/")
+            url("https://claude-3-haiku-ai.p.rapidapi.com")
         }
     }
 }
