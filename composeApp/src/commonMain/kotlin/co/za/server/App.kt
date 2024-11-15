@@ -52,11 +52,17 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.SoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import io.ktor.client.call.body
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import network.client
+import network.models.ApiRequestDto
 import network.models.ApiResponseDto
+import network.models.MessageDto
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 const val numberOfDots = 4
@@ -72,22 +78,16 @@ fun App(windowSizeClass: WindowSizeClass) {
 
     MaterialTheme {
         var isLoading by remember { mutableStateOf(false) }
-        var showContent by remember { mutableStateOf(false) }
         var question by remember { mutableStateOf("") }
         val keyboardController = LocalSoftwareKeyboardController.current
         val questionsAndAnswers: List<Triple<String, ApiResponseDto?, Boolean>> =
             remember { mutableStateListOf() }
-        val questionsAndAnswers2 = remember {
-            mutableStateListOf(
-                QuestionAndAnswer("What is your name?", "My name is Claude", false),
-                QuestionAndAnswer("What is your age?", "I am 3 years old", false),
-                QuestionAndAnswer("What is your favorite color?", "I like all colors", false)
-            )
+        val questionsAndAnswers2:SnapshotStateList<QuestionAndAnswer> = remember {
+            mutableStateListOf()
         }
         val listState = rememberLazyListState()
         val scope = rememberCoroutineScope()
 
-        var answer: ApiResponseDto? by remember { mutableStateOf(null) }
         val alignment = when {
 
             windowSizeClass.widthSizeClass > WindowWidthSizeClass.Expanded -> {
@@ -125,15 +125,14 @@ fun App(windowSizeClass: WindowSizeClass) {
                     .weight(0.8f, false)
             ) {
 
-                //Text(text = "My answer to you", style = MaterialTheme.typography.h4)
                 item {
-                    if (questionsAndAnswers.isEmpty()) {
+                    if (questionsAndAnswers2.isEmpty()) {
                         Text(
-                            "Ask me something...", style = MaterialTheme.typography.h4
+                            "Lets Chat...", style = MaterialTheme.typography.h6
                         )
                     } else {
                         Text(
-                            "Current conversation", style = MaterialTheme.typography.h4
+                            "Current conversation", style = MaterialTheme.typography.h6
                         )
                     }
 
@@ -164,7 +163,6 @@ fun App(windowSizeClass: WindowSizeClass) {
                     }
                 }
 
-
                 items(questionsAndAnswers2) { qa ->
                     Column(
                         verticalArrangement = spacedBy(8.dp),
@@ -184,7 +182,7 @@ fun App(windowSizeClass: WindowSizeClass) {
                             elevation = 0.2.dp
                         ) {
                             Text(
-                                modifier = Modifier.padding(16.dp),
+                                modifier = Modifier.padding(24.dp),
                                 text = qa.question,
                                 style = MaterialTheme.typography.body1
                             )
@@ -195,7 +193,7 @@ fun App(windowSizeClass: WindowSizeClass) {
                         } else {
                             Text("Claude-3-haiku ", style = MaterialTheme.typography.caption)
                             Card(
-                                shape = RoundedCornerShape(16.dp),
+                                shape = RoundedCornerShape(24.dp),
                                 backgroundColor = Color(240, 240, 240),
                                 contentColor = MaterialTheme.colors.onSecondary,
                                 modifier = Modifier.align(Alignment.Start),
@@ -203,22 +201,19 @@ fun App(windowSizeClass: WindowSizeClass) {
                             ) {
                                 Text(
                                     modifier = Modifier.padding(16.dp), text =
-                                    qa.answer.fold("") { acc, messageDto -> "$acc $messageDto" },
+                                    qa.answer,
                                     style = MaterialTheme.typography.body1
                                 )
                             }
                         }
                     }
                 }
-
             }
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier.fillMaxWidth(alignment).padding(horizontal = 16.dp)
             )
             {
-
-
                 if (sideButton) {
                     FooterHorizontal(
                         question,
@@ -240,15 +235,9 @@ fun App(windowSizeClass: WindowSizeClass) {
                         { question = it }
                     ) { isLoading = it }
                 }
-
-
             }
-
         }
-
-
     }
-
 }
 
 @Composable
@@ -307,27 +296,6 @@ private fun Footer(
                     onQuestionChanged,
                     onLoadingChanged
                 )
-                /*CoroutineScope(Job()).launch {
-                            isLoading = true
-                            *//*answer = client.post("/") {
-                                setBody(
-                                    ApiRequestDto(
-                                        model = "claude-3-haiku-20240307",
-                                        messages = listOf(
-                                            MessageDto(
-                                                content = question,
-                                                role = "user"
-                                            )
-                                        )
-                                    )
-                                )
-                            }.body()*//*
-                            //questionsAndAnswers.add(Pair(question, answer))
-                            delay(3000)
-                            questionsAndAnswers2[questionsAndAnswers2.size - 1] = QuestionAndAnswer(question, "New answer for $question",false)
-                            question = ""
-                            isLoading = false
-                        }*/
             }) {
             if (isLoading) {
                 CircularProgressIndicator(
@@ -355,7 +323,7 @@ private fun FooterHorizontal(
     Row(
         horizontalArrangement = SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+        modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp)
     ) {
         OutlinedTextField(
             colors = TextFieldDefaults.textFieldColors(
@@ -383,14 +351,14 @@ private fun FooterHorizontal(
             })
         )
 
-        Box(Modifier.weight(0.2f)) {
+        Box(Modifier.weight(0.2f).padding(start = 16.dp)) {
             Button(
                 shape = CircleShape,
                 contentPadding = PaddingValues(0.dp),
                 colors = ButtonDefaults.buttonColors(
                     backgroundColor = MaterialTheme.colors.secondaryVariant,
                     contentColor = MaterialTheme.colors.surface
-                ), modifier = Modifier.size(60.dp).align(Alignment.Center), onClick = {
+                ), modifier = Modifier.size(60.dp), onClick = {
                     keyboardController?.hide()
                     handleMessage(
                         questionsAndAnswers2,
@@ -400,27 +368,6 @@ private fun FooterHorizontal(
                         onQuestionChanged,
                         onLoadingChanged
                     )
-                    /*CoroutineScope(Job()).launch {
-                                isLoading = true
-                                *//*answer = client.post("/") {
-                                 setBody(
-                                     ApiRequestDto(
-                                         model = "claude-3-haiku-20240307",
-                                         messages = listOf(
-                                             MessageDto(
-                                                 content = question,
-                                                 role = "user"
-                                             )
-                                         )
-                                     )
-                                 )
-                             }.body()*//*
-                             //questionsAndAnswers.add(Pair(question, answer))
-                             delay(3000)
-                             questionsAndAnswers2[questionsAndAnswers2.size - ] = QuestionAndAnswer(question, "New answer for $question",false)
-                             question = ""
-                             isLoading = false
-                         }*/
                 }) {
                 if (isLoading) {
                     CircularProgressIndicator(
@@ -450,65 +397,36 @@ private fun handleMessage(
             questionsAndAnswers2.size,
             scrollOffset = questionsAndAnswers2.size - 1
         )
-        delay(1000)
     }
     CoroutineScope(Job()).launch {
         onLoadingChange(true)
 
 
-        /*answer = client.post("/") {
-                                    setBody(
-                                        ApiRequestDto(
-                                            model = "claude-3-haiku-20240307",
-                                            messages = listOf(
-                                                MessageDto(
-                                                    content = question,
-                                                    role = "user"
-                                                )
-                                            )
-                                        )
-                                    )
-                                }.body()*/
-        //questionsAndAnswers.add(Pair(question, answer))
+        val answer: ApiResponseDto = client.post("/") {
+            setBody(
+                ApiRequestDto(
+                    model = "claude-3-haiku-20240307",
+                    messages = listOf(
+                        MessageDto(
+                            content = question,
+                            role = "user"
+                        )
+                    )
+                )
+            )
+        }.body()
 
-
-        delay(2000)
         questionsAndAnswers2[questionsAndAnswers2.size - 1] = questionsAndAnswers2.last().copy(
-            answer = "" +
-                    "lorem fefd asdfd asdff eeeew sdfdfd sdfdfd sdf New answer for $question" +
-                    "lorem fefd asdfd asdff eeeew sdfdfd sdfdfd sdf New answer for $question" +
-                    "lorem fefd asdfd asdff eeeew sdfdfd sdfdfd sdf New answer for $question" +
-                    "lorem fefd asdfd asdff eeeew sdfdfd sdfdfd sdf New answer for $question" +
-                    "lorem fefd asdfd asdff eeeew sdfdfd sdfdfd sdf New answer for $question" +
-                    "lorem fefd asdfd asdff eeeew sdfdfd sdfdfd sdf New answer for $question" +
-                    "lorem fefd asdfd asdff eeeew sdfdfd sdfdfd sdf New answer for $question" +
-                    "lorem fefd asdfd asdff eeeew sdfdfd sdfdfd sdf New answer for $question" +
-                    "lorem fefd asdfd asdff eeeew sdfdfd sdfdfd sdf New answer for $question" +
-                    "lorem fefd asdfd asdff eeeew sdfdfd sdfdfd sdf New answer for $question" +
-                    "lorem fefd asdfd asdff eeeew sdfdfd sdfdfd sdf New answer for $question" +
-                    "lorem fefd asdfd asdff eeeew sdfdfd sdfdfd sdf New answer for $question" +
-                    "lorem fefd asdfd asdff eeeew sdfdfd sdfdfd sdf New answer for $question" +
-                    "lorem fefd asdfd asdff eeeew sdfdfd sdfdfd sdf New answer for $question" +
-                    "lorem fefd asdfd asdff eeeew sdfdfd sdfdfd sdf New answer for $question" +
-                    "lorem fefd asdfd asdff eeeew sdfdfd sdfdfd sdf New answer for $question" +
-                    "lorem fefd asdfd asdff eeeew sdfdfd sdfdfd sdf New answer for $question" +
-                    "lorem fefd asdfd asdff eeeew sdfdfd sdfdfd sdf New answer for $question" +
-                    "lorem fefd asdfd asdff eeeew sdfdfd sdfdfd sdf New answer for $question" +
-                    "lorem fefd asdfd asdff eeeew sdfdfd sdfdfd sdf New answer for $question" +
-                    "lorem fefd asdfd asdff eeeew sdfdfd sdfdfd sdf New answer for $question" +
-                    "lorem fefd asdfd asdff eeeew sdfdfd sdfdfd sdf New answer for $question" +
-                    "lorem fefd asdfd asdff eeeew sdfdfd sdfdfd sdf New answer for $question" +
-                    "lorem fefd asdfd asdff eeeew sdfdfd sdfdfd sdf New answer for $question" +
-                    "lorem fefd asdfd asdff eeeew sdfdfd sdfdfd sdf New answer for $question",
+            answer = answer.choices.map { it.message.content }
+                .reduce { acc, content -> "$acc $content" },
             isTyping = false
         )
-        scope.launch {
 
+        scope.launch {
             listState.animateScrollToItem(
                 questionsAndAnswers2.size,
                 scrollOffset = questionsAndAnswers2.size
             )
-            delay(1000)
         }
 
         onLoadingChange(false)
@@ -566,5 +484,11 @@ fun DotsTyping() {
 data class QuestionAndAnswer(
     val question: String,
     val answer: String,
+    val isTyping: Boolean = false
+)
+
+data class QuestionAndAnswer1(
+    val question: String,
+    val answer: List<String>,
     val isTyping: Boolean = false
 )
